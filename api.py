@@ -28,7 +28,7 @@ def telegram_bot_sendtext(bot_message):
     
     bot_token = ''
     bot_chatID = ''
-    send_text = 'https://api.telegram.org/bot' + '2053306894:AAGAHjOmNiXLFCsUkdxTW2M6dJMfX6UQO2c' + '/sendMessage?chat_id=' + '2056522270' + '&parse_mode=Markdown&text=' + bot_message
+    send_text = 'https://api.telegram.org/bot' + '1984695297:AAEX20AH_trDS9TT4ljpDR22X2J5P2Kh73U' + '/sendMessage?chat_id=' + '2056522270' + '&parse_mode=Markdown&text=' + bot_message
 
     response = requests.get(send_text)
 
@@ -62,4 +62,4 @@ def get_min_court(my_symbol):
 
 
 if __name__ == "__main__":
-   get_min_court("BTCUSDT")
+   get_min_court("BTCEUR")

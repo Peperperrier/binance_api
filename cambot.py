@@ -16,33 +16,14 @@ bot.
 
 import logging
 import os
-import binance
 import time
 import datetime
 import requests
 import threading
 import configparser
 
-from binance.client import Client
-
 from telegram import Update, ForceReply
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
-
-# init
-api_key     = os.environ.get('binance_api')
-api_secret  = os.environ.get('binance_secret')
-client      = Client(api_key, api_secret)
-
-# Value to check crypto court
-config = configparser.ConfigParser()
-config.read('config.ini')
-max = float(config['BINANCE']['max_value'])
-
-min = 0
-max_time = ""
-str_btc_price = ""
-var = 0
-btc_buy_price = 0
 
 # Enable logging
 logging.basicConfig(
@@ -55,50 +36,11 @@ def telegram_bot_sendtext(bot_message):
     
     bot_token = ''
     bot_chatID = ''
-    send_text = 'https://api.telegram.org/bot' + '2053306894:AAGAHjOmNiXLFCsUkdxTW2M6dJMfX6UQO2c' + '/sendMessage?chat_id=' + '2056522270' + '&parse_mode=Markdown&text=' + bot_message
+    send_text = 'https://api.telegram.org/bot' + '1984695297:AAEX20AH_trDS9TT4ljpDR22X2J5P2Kh73U' + '/sendMessage?chat_id=' + '2056522270' + '&parse_mode=Markdown&text=' + bot_message
 
     response = requests.get(send_text)
 
     return response.json()
-
-def get_min_court():
-    global max
-    global min
-    global max_time
-    global str_btc_price
-    global var
-    global btc_buy_price
-
-    old_time = 80
-
-    while 1:
-        # get latest price from Binance API
-        btc_price = client.get_symbol_ticker(symbol="BTCEUR")
-        str_btc_price = str(float(btc_price["price"]))
-
-        # Calcul of current position
-        if (max < float(btc_price["price"])):
-            max = float(btc_price["price"])
-            config['BINANCE']['max_value'] = str(max)
-            print("max " + str(max))
-            with open('config.ini', 'w') as configfile:
-                config.write(configfile)
-            max_time = str(datetime.datetime.now())
-        if (min > float(btc_price["price"])):
-            min = float(btc_price["price"])
-        var = (max / float(btc_price["price"]))
-        
-        if((old_time != datetime.datetime.now().minute and var > 1.05)):
-            # print("Sell! -> variation is  "+ str(max / float(btc_price["price"])))
-            old_time = datetime.datetime.now().minute
-            telegram_bot_sendtext("Sell! -> variation is  "+ str(max / float(btc_price["price"])))
-
-        # Print current value
-        # print(str(datetime.datetime.now())+ "    |   " + btc_price["price"] + "    |   " + str(max) + "    |   " + max_time + "    |   " + str(var))
-
-        # WAit 5sec
-        time.sleep(5)
-
 
 # Define a few command handlers. These usually take the two arguments update and
 # context.
@@ -110,30 +52,33 @@ def start(update: Update, context: CallbackContext) -> None:
         reply_markup=ForceReply(selective=True),
     )
 
-
 def help_command(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /help is issued."""
     update.message.reply_text('Help!')
 
-
 def echo(update: Update, context: CallbackContext) -> None:
     """Echo the user message."""
     update.message.reply_text(update.message.text)
+
+def start_motion(update: Update, context: CallbackContext) -> None:
+    """Send an OS command to start services."""
+    update.message.reply_text("Trying to start motion")
+    os.system("sudo systemctl start motion" )
+
+def stop_motion(update: Update, context: CallbackContext) -> None:
+    """Send an OS command to start services."""
+    update.message.reply_text("Trying to stop motion")
+    os.system("sudo systemctl stop motion" )
 
 def last(update: Update, context: CallbackContext) -> None:
     """Echo the user message."""
     for file in os.listdir("./"):
         if file.endswith(".mkv"):
             my_file = file
-    print(my_file)
+    # print(my_file)
     update.message.reply_text(str(my_file))
-    update.message.reply_video(video=open(my_file, 'rb'))
+    update.message.reply_video(video=open(os.path.join('/tmp/motion/', my_file), 'rb'))
     
-def max_command(update: Update, context: CallbackContext) -> None:
-    """Echo the user message."""
-    update.message.reply_text(str(datetime.datetime.now())+ "    |   " + str_btc_price + "    |   " + str(max) + "    |   " + max_time + "    |   " + str(var))
-    # update.message.reply_text("price" + str_btc_price)
-
 def main() -> None:
     """Start the bot."""
     # Create the Updater and pass it your bot's token.
@@ -145,8 +90,9 @@ def main() -> None:
     # on different commands - answer in Telegram
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("help", help_command))
-    dispatcher.add_handler(CommandHandler("max", max_command))
     dispatcher.add_handler(CommandHandler("last", last))
+    dispatcher.add_handler(CommandHandler("motion", start_motion))
+    dispatcher.add_handler(CommandHandler("stop", stop_motion))
 
     # on non command i.e message - echo the message on Telegram
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
@@ -162,6 +108,4 @@ def main() -> None:
 
 if __name__ == '__main__':
     telegram_bot_sendtext("Bot is started ! ")
-    # x = threading.Thread(target=get_min_court)
-    # x.start()
     main()
