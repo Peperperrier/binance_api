@@ -29,25 +29,37 @@ from telegram import Update, ForceReply
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 # init
-api_key     = os.environ.get('binance_api')
-api_secret  = os.environ.get('binance_secret')
-client      = Client(api_key, api_secret)
+api_key         = os.environ.get('binance_api')
+api_secret      = os.environ.get('binance_secret')
+client          = Client(api_key, api_secret)
+TOKEN           = '2001873085:AAGwq7zXUZqq15-0Rvcp7hAooFHVquwoNHQ'
+CHAT_ID         = '2056522270'
+
 
 # Value to check crypto court
 config = configparser.ConfigParser()
 config.read('config.ini')
 max = float(config['BINANCE']['max_value'])
+str_max_time = str(config['BINANCE']['max_time'])
+min = float(config['BINANCE']['min_value'])
+str_min_time = str(config['BINANCE']['min_time'])
 
-min = 0
-max_time = ""
+trigger = float(config['BINANCE']['trigger'])
+trig_max = float(config['BINANCE']['trig_max'])
+trig_min = str(config['BINANCE']['trig_min'])
+
+en_min = False
+en_max = False
+
 str_btc_price = ""
-var = 0
 btc_buy_price = 0
+var_max = 0
+var_min = 0
+
+
 
 # Enable logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
-)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +67,7 @@ def telegram_bot_sendtext(bot_message):
     
     bot_token = ''
     bot_chatID = ''
-    send_text = 'https://api.telegram.org/bot' + '2053306894:AAGAHjOmNiXLFCsUkdxTW2M6dJMfX6UQO2c' + '/sendMessage?chat_id=' + '2056522270' + '&parse_mode=Markdown&text=' + bot_message
+    send_text = 'https://api.telegram.org/bot' + TOKEN + '/sendMessage?chat_id=' + CHAT_ID + '&parse_mode=Markdown&text=' + bot_message
 
     response = requests.get(send_text)
 
@@ -64,10 +76,19 @@ def telegram_bot_sendtext(bot_message):
 def get_min_court():
     global max
     global min
-    global max_time
+    global str_max_time
+    global str_min_time
+
     global str_btc_price
-    global var
+    global var_max
+    global var_min
+    global en_max
+    global en_min
     global btc_buy_price
+
+    global trigger
+    global trig_max
+    global trig_min
 
     old_time = 80
 
@@ -80,18 +101,30 @@ def get_min_court():
         if (max < float(btc_price["price"])):
             max = float(btc_price["price"])
             config['BINANCE']['max_value'] = str(max)
-            print("max " + str(max))
+            str_max_time = str(datetime.datetime.now())
+            config['BINANCE']['max_time'] = str_max_time
             with open('config.ini', 'w') as configfile:
                 config.write(configfile)
-            max_time = str(datetime.datetime.now())
+            
         if (min > float(btc_price["price"])):
             min = float(btc_price["price"])
-        var = (max / float(btc_price["price"]))
+            config['BINANCE']['min_value'] = str(min)
+            str_min_time = str(datetime.datetime.now())
+            config['BINANCE']['min_time'] = str_min_time
+            with open('config.ini', 'w') as configfile:
+                config.write(configfile)
         
-        if((old_time != datetime.datetime.now().minute and var > 1.05)):
-            # print("Sell! -> variation is  "+ str(max / float(btc_price["price"])))
+        # Calcul de variation    
+        var_max = (max / float(btc_price["price"]))
+        var_min = (float(btc_price["price"]) / min)
+        
+        if (old_time != datetime.datetime.now().minute):
             old_time = datetime.datetime.now().minute
-            telegram_bot_sendtext("Sell! -> variation is  "+ str(max / float(btc_price["price"])))
+            if ((en_max == True) and var_max > trigger):
+                telegram_bot_sendtext("Sell! -> variation is  "+ str(max / float(btc_price["price"])))
+
+            if ((en_min == True) and var_min > trigger):
+                telegram_bot_sendtext("Buy! -> variation is  "+ str(float(btc_price["price"]) / min))
 
         # Print current value
         # print(str(datetime.datetime.now())+ "    |   " + btc_price["price"] + "    |   " + str(max) + "    |   " + max_time + "    |   " + str(var))
@@ -115,29 +148,48 @@ def help_command(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /help is issued."""
     update.message.reply_text('Help!')
 
-
 def echo(update: Update, context: CallbackContext) -> None:
     """Echo the user message."""
     update.message.reply_text(update.message.text)
-
-def last(update: Update, context: CallbackContext) -> None:
-    """Echo the user message."""
-    for file in os.listdir("./"):
-        if file.endswith(".mkv"):
-            my_file = file
-    print(my_file)
-    update.message.reply_text(str(my_file))
-    update.message.reply_video(video=open(my_file, 'rb'))
     
 def max_command(update: Update, context: CallbackContext) -> None:
     """Echo the user message."""
-    update.message.reply_text(str(datetime.datetime.now())+ "    |   " + str_btc_price + "    |   " + str(max) + "    |   " + max_time + "    |   " + str(var))
+    update.message.reply_text(str(datetime.datetime.now())+ "    |   " + str_btc_price + "    |   " + str(max) + "    |   " + str_max_time + "    |   " + str(var_max))
     # update.message.reply_text("price" + str_btc_price)
+
+def min_command(update: Update, context: CallbackContext) -> None:
+    """Echo the user message."""
+    update.message.reply_text(str(datetime.datetime.now())+ "    |   " + str_btc_price + "    |   " + str(min) + "    |   " + str_min_time + "    |   " + str(var_min))
+    # update.message.reply_text("price" + str_btc_price)
+
+def en_max_command(update: Update, context: CallbackContext) -> None:
+    """Echo the user message."""
+    global en_max
+    en_max = True
+    update.message.reply_text("en_max = True")
+
+def en_min_command(update: Update, context: CallbackContext) -> None:
+    """Echo the user message."""
+    global en_min
+    en_min = True
+    update.message.reply_text("en_min = True")
+
+def dis_max_command(update: Update, context: CallbackContext) -> None:
+    """Echo the user message."""
+    global en_max
+    en_max = False
+    update.message.reply_text("en_max = False")
+
+def dis_min_command(update: Update, context: CallbackContext) -> None:
+    """Echo the user message."""
+    global en_min
+    en_min = False
+    update.message.reply_text("en_min = False")
 
 def main() -> None:
     """Start the bot."""
     # Create the Updater and pass it your bot's token.
-    updater = Updater('1984695297:AAEX20AH_trDS9TT4ljpDR22X2J5P2Kh73U')
+    updater = Updater(TOKEN)
 
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
@@ -146,7 +198,11 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("max", max_command))
-    dispatcher.add_handler(CommandHandler("last", last))
+    dispatcher.add_handler(CommandHandler("min", min_command))
+    dispatcher.add_handler(CommandHandler("enablemax", en_max_command))
+    dispatcher.add_handler(CommandHandler("enablemin", en_min_command))
+    dispatcher.add_handler(CommandHandler("disablemax", dis_max_command))
+    dispatcher.add_handler(CommandHandler("disablemin", dis_min_command))
 
     # on non command i.e message - echo the message on Telegram
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
@@ -162,6 +218,6 @@ def main() -> None:
 
 if __name__ == '__main__':
     telegram_bot_sendtext("Bot is started ! ")
-    # x = threading.Thread(target=get_min_court)
-    # x.start()
+    x = threading.Thread(target=get_min_court)
+    x.start()
     main()
